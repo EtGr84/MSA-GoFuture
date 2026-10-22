@@ -1,1 +1,54 @@
+@startuml GoFuture_Task3_Global_Deployment_C2
+!include <C4/C4_Container>
 
+LAYOUT_TOP_DOWN()
+skinparam linetype ortho
+skinparam nodesep 55
+skinparam ranksep 60
+
+AddContainerTag("new", $bgColor="#B71C1C", $fontColor="#FFFFFF", $borderColor="#7F0000", $legendText="new / changed in Task3")
+AddSystemTag("new", $bgColor="#B71C1C", $fontColor="#FFFFFF", $borderColor="#7F0000", $legendText="new / changed in Task3")
+AddRelTag("new", $textColor="#B71C1C", $lineColor="#B71C1C", $lineThickness="2", $legendText="new routing/security flow")
+
+Person(users, "Пользователи", "SEA и LATAM пассажиры, водители, корпоративные клиенты")
+System_Ext(ext, "Внешние провайдеры", "Карты, платежи, банки, push")
+
+System_Boundary(platform, "GoFuture Global To-Be") {
+    Container(global_tm, "Global Traffic Manager", "GeoDNS / Anycast", "Маршрутизация в ближайший здоровый регион", "", "new")
+    Container(edge_sec, "Edge WAF + DDoS Protection", "WAF / Bot protection / Rate limit", "Фильтрация атак до региональных API", "", "new")
+
+    Container_Boundary(regions, "Active regional deployments") {
+        Container(sea1, "SEA-1 Singapore", "Kubernetes + Kafka + PostgreSQL", "Активный регион для SEA", "", "new")
+        Container(sea2, "SEA-2 Jakarta", "Kubernetes + Kafka + PostgreSQL", "Активный регион и failover для SEA", "", "new")
+        Container(latam1, "LATAM-1 Sao Paulo", "Kubernetes + Kafka + PostgreSQL", "Активный регион для Brazil/eastern South America", "", "new")
+        Container(latam2, "LATAM-2 Santiago", "Kubernetes + Kafka + PostgreSQL", "Активный регион и failover для LATAM", "", "new")
+    }
+
+    Container(control, "Control / Partner Region", "Yandex Cloud Russia/Kazakhstan", "Back-office, GitOps, CI/CD и control plane; не считается user runtime", "", "new")
+    Container(regional_security, "Regional Firewall + Network Policies", "Firewall / SG / Kubernetes NetworkPolicy", "Сегментация входящего и межсервисного трафика", "", "new")
+    Container(service_mesh, "Service Mesh mTLS", "Istio/Linkerd", "mTLS, retries, circuit breaking, traffic policy", "", "new")
+    Container(observability, "Global Observability", "Prometheus / Grafana / Loki / Alertmanager", "SLO, health checks, synthetic probes, failover signals", "", "new")
+    Container(replication, "Inter-region Replication", "Kafka MirrorMaker / DB replicas", "Разрешённые события и агрегаты между регионами", "", "new")
+}
+
+Rel(users, global_tm, "geo lookup", "DNS/Anycast", "", "", "new")
+Rel(global_tm, edge_sec, "route to healthy edge", "HTTPS", "", "", "new")
+Rel(edge_sec, regional_security, "filtered traffic", "HTTPS", "", "", "new")
+Rel(regional_security, regions, "regional API traffic", "HTTPS", "", "", "new")
+Rel(regions, service_mesh, "east-west traffic", "mTLS", "", "", "new")
+Rel(regions, replication, "events / aggregates", "Kafka/CDC", "", "", "new")
+Rel(control, regions, "GitOps / control APIs", "VPN/private link", "", "", "new")
+Rel(observability, global_tm, "health signals", "API", "", "", "new")
+Rel(regions, ext, "regional integrations", "REST")
+
+Lay_D(users, global_tm)
+Lay_D(global_tm, edge_sec)
+Lay_D(edge_sec, regional_security)
+Lay_D(regional_security, regions)
+Lay_D(regions, replication)
+Lay_R(regions, service_mesh)
+Lay_D(control, regions)
+Lay_D(replication, observability)
+
+SHOW_LEGEND()
+@enduml
