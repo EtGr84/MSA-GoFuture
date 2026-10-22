@@ -9,13 +9,13 @@ skinparam ranksep 55
 System_Ext(partner_idp, "Partner IdP", "OIDC / SAML")
 
 Container_Boundary(onboarding_boundary, "Onboarding Service") {
-    Component(intake, "1. Intake API", "REST", "Принимает заявку: регион, tier, интеграции")
-    Component(validation, "2. Validation Worker", "Worker", "Проверяет документы, домены, compliance профиль")
-    Component(workflow, "3. Workflow Engine", "Temporal/Camunda-like", "Управляет состоянием onboarding")
-    Component(iam_step, "4. IAM Provisioning Step", "Adapter", "Создаёт realm, groups, roles, apps")
-    Component(data_step, "5. Data Provisioning Step", "Adapter", "Создаёт DB/schema, Kafka namespace, KMS key")
-    Component(config_step, "6. Config Provisioning Step", "Adapter", "Создаёт feature flags, тарифы, quotas")
-    Component(readiness, "7. Readiness Checks", "Worker", "Проверяет SSO, API, БД, мониторинг")
+    Component(intake, "Intake API", "REST", "Принимает заявку: регион, tier, интеграции")
+    Component(validation, "Validation Worker", "Worker", "Проверяет документы, домены, compliance профиль")
+    Component(workflow, "Workflow Engine", "Temporal/Camunda-like", "Управляет состоянием onboarding")
+    Component(iam_step, "IAM Provisioning Step", "Adapter", "Создаёт realm, groups, roles, apps")
+    Component(data_step, "Data Provisioning Step", "Adapter", "Создаёт DB/schema, Kafka namespace, KMS key")
+    Component(config_step, "Config Provisioning Step", "Adapter", "Создаёт feature flags, тарифы, quotas")
+    Component(readiness, "Readiness Checks", "Worker", "Проверяет SSO, API, БД, мониторинг")
 }
 
 Container(registry, "Tenant Registry", "PostgreSQL", "tenant_id, status, region, isolation tier")
@@ -24,12 +24,12 @@ Container(iac, "Provisioning Engine", "Terraform / GitOps", "Инфрастру�
 Container(observability, "Tenant Observability", "Grafana / Prometheus / Loki", "Дашборды, алерты, tenant labels")
 Container(audit, "Audit Log", "Append-only", "История onboarding и админских действий")
 
-Rel_L(intake, validation, "2. validate")
-Rel(validation, workflow, "3. approved")
-Rel(workflow, iam_step, "4. IAM")
-Rel(iam_step, data_step, "5. data")
-Rel_L(data_step, config_step, "6. config")
-Rel(config_step, readiness, "7. checks")
+Rel_L(intake, validation, "validate")
+Rel(validation, workflow, "approved")
+Rel(workflow, iam_step, "IAM")
+Rel(iam_step, data_step, "data")
+Rel_L(data_step, config_step, "config")
+Rel(config_step, readiness, "checks")
 
 Rel(workflow, registry, "")
 Rel(iam_step, iam, "")
