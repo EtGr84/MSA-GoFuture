@@ -1,1 +1,41 @@
+@startuml GoFuture_Task3_Geo_Routing_C4
+!include <C4/C4_Container>
 
+LAYOUT_TOP_DOWN()
+skinparam linetype ortho
+
+AddContainerTag("new", $bgColor="#B71C1C", $fontColor="#FFFFFF", $borderColor="#7F0000", $legendText="new / changed in Task3")
+AddRelTag("new", $textColor="#B71C1C", $lineColor="#B71C1C", $lineThickness="2", $legendText="geo routing flow")
+
+Person(user, "Пользователь", "Пассажир, водитель или корпоративный клиент")
+
+Container(tm, "Global Traffic Manager", "GeoDNS / Anycast", "Выбирает ближайший здоровый регион", "", "new")
+Container(waf, "Edge WAF + DDoS", "WAF / Rate limit", "Защищает публичный вход", "", "new")
+
+Container(sea1, "SEA-1 Singapore API Edge", "Regional API Gateway", "Основной SEA endpoint", "", "new")
+Container(sea2, "SEA-2 Jakarta API Edge", "Regional API Gateway", "Failover SEA endpoint", "", "new")
+Container(latam1, "LATAM-1 Sao Paulo API Edge", "Regional API Gateway", "Brazil/eastern South America endpoint", "", "new")
+Container(latam2, "LATAM-2 Santiago API Edge", "Regional API Gateway", "Chile/Andean endpoint and LATAM failover", "", "new")
+Container(control, "Control Region API Edge", "Regional API Gateway", "Back-office/current clients; not user runtime", "", "new")
+Container(health, "Synthetic Health Checks", "Probes", "Проверяет API, Kafka, DB, critical journeys", "", "new")
+
+Rel(user, tm, "DNS / Anycast", "", "", "", "new")
+Rel(tm, waf, "healthy route", "", "", "", "new")
+Rel(waf, sea1, "SEA traffic", "HTTPS", "", "", "new")
+Rel(waf, sea2, "SEA failover", "HTTPS", "", "", "new")
+Rel(waf, latam1, "Brazil/eastern LATAM traffic", "HTTPS", "", "", "new")
+Rel(waf, latam2, "Chile/Andean traffic + LATAM failover", "HTTPS", "", "", "new")
+Rel(waf, control, "control traffic", "HTTPS", "", "", "new")
+Rel(health, tm, "health status", "API", "", "", "new")
+
+Lay_D(user, tm)
+Lay_D(tm, waf)
+Lay_D(waf, sea1)
+Lay_R(sea1, sea2)
+Lay_R(sea2, latam1)
+Lay_R(latam1, latam2)
+Lay_R(latam2, control)
+Lay_D(health, tm)
+
+SHOW_LEGEND()
+@enduml
