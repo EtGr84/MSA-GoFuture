@@ -1,1 +1,54 @@
+@startuml GoFuture_Task5_Onboarding_C3
+!include <C4/C4_Component>
 
+LAYOUT_TOP_DOWN()
+skinparam linetype ortho
+skinparam nodesep 50
+skinparam ranksep 55
+
+System_Ext(partner_idp, "Partner IdP", "OIDC / SAML")
+
+Container_Boundary(onboarding_boundary, "Onboarding Service") {
+    Component(intake, "1. Intake API", "REST", "Принимает заявку: регион, tier, интеграции")
+    Component(validation, "2. Validation Worker", "Worker", "Проверяет документы, домены, compliance профиль")
+    Component(workflow, "3. Workflow Engine", "Temporal/Camunda-like", "Управляет состоянием onboarding")
+    Component(iam_step, "4. IAM Provisioning Step", "Adapter", "Создаёт realm, groups, roles, apps")
+    Component(data_step, "5. Data Provisioning Step", "Adapter", "Создаёт DB/schema, Kafka namespace, KMS key")
+    Component(config_step, "6. Config Provisioning Step", "Adapter", "Создаёт feature flags, тарифы, quotas")
+    Component(readiness, "7. Readiness Checks", "Worker", "Проверяет SSO, API, БД, мониторинг")
+}
+
+Container(registry, "Tenant Registry", "PostgreSQL", "tenant_id, status, region, isolation tier")
+Container(iam, "IAM / IdP", "OIDC/SAML", "SSO, MFA, RBAC")
+Container(iac, "Provisioning Engine", "Terraform / GitOps", "Инфраструктурные ресурсы")
+Container(observability, "Tenant Observability", "Grafana / Prometheus / Loki", "Дашборды, алерты, tenant labels")
+Container(audit, "Audit Log", "Append-only", "История onboarding и админских действий")
+
+Rel_L(intake, validation, "2. validate")
+Rel(validation, workflow, "3. approved")
+Rel(workflow, iam_step, "4. IAM")
+Rel(iam_step, data_step, "5. data")
+Rel_L(data_step, config_step, "6. config")
+Rel(config_step, readiness, "7. checks")
+
+Rel(workflow, registry, "")
+Rel(iam_step, iam, "")
+Rel_L(iam, partner_idp, "")
+Rel(data_step, iac, "")
+Rel(config_step, registry, "")
+Rel_L(readiness, observability, "")
+Rel(workflow, audit, "")
+
+Lay_D(intake, validation)
+Lay_D(validation, workflow)
+Lay_D(workflow, iam_step)
+Lay_D(iam_step, data_step)
+Lay_D(data_step, config_step)
+Lay_D(config_step, readiness)
+Lay_R(workflow, registry)
+Lay_R(iam_step, iam)
+Lay_R(data_step, iac)
+Lay_R(readiness, observability)
+
+SHOW_LEGEND()
+@enduml
