@@ -1,0 +1,72 @@
+@startuml GoFuture_Task1_ToBe
+!include <C4/C4_Container>
+
+LAYOUT_TOP_DOWN()
+skinparam linetype ortho
+skinparam nodesep 55
+skinparam ranksep 60
+
+Person(users, "Пользователи", "Пассажиры, водители, корпоративные менеджеры и бухгалтеры")
+System_Ext(external_integrations, "Внешние интеграции", "Яндекс Карты, Яндекс Пэй, API Банка, push-провайдеры")
+System_Ext(datalens, "DataLens", "BI-дашборды")
+
+System_Boundary(gofuture, "GoFuture Platform To-Be") {
+    Container(clients, "Клиентские приложения", "Mobile / Web", "Пассажирское и водительское приложения, корпоративный портал, админ-панель")
+
+    Container(api_gateway, "API Gateway / BFF", "Envoy/Nginx + REST adapters", "Сохраняет старые REST-контракты и постепенно переводит маршруты на сервисы")
+
+    Container(legacy_monolith, "Legacy Monolith", "Django", "Неперенесённые сценарии до завершения миграции")
+    Container(compat_layer, "Compatibility / ACL Layer", "Python adapters", "Адаптирует старые DTO и защищает новые сервисы от legacy-модели")
+
+    Container_Boundary(core_services, "Core domain services") {
+        Container(booking_service, "Booking Service", "Python service", "Заказы, поездки, статусы")
+        Container(driver_service, "Driver Service", "Python service", "Водители, документы, смены")
+        Container(geography_service, "Geography Service", "Python service", "ETA, маршруты, зоны")
+        Container(pricing_service, "Pricing Service", "Python service", "Тарифы и динамическая цена")
+        Container(fraud_service, "Fraud Service", "Python service", "Скоринг поездок и платежей")
+        Container(payments_service, "Payments Service", "Python service", "Оплаты, счета, выплаты, ledger")
+    }
+
+    ContainerQueue(event_broker, "Integration Broker", "RabbitMQ + Outbox/CDC", "Доменные события, команды и синхронизация на время миграции")
+
+    Container_Boundary(async_services, "Async and data services") {
+        Container(notification_service, "Notification Service", "Python workers/API", "Шаблоны, предпочтения и доставка уведомлений")
+        Container(analytics_service, "Analytics Service", "Flink/Spark jobs + API", "События, агрегаты и BI-витрины")
+    }
+
+    ContainerDb(service_datastores, "Private service datastores", "PostgreSQL / ClickHouse / Elasticsearch / Redis", "Каждый доменный сервис владеет своей БД, схемой или индексом")
+
+    Container(observability, "Observability Stack", "Prometheus / Grafana / Loki / Alertmanager", "Метрики, логи, трейсы, SLO и алерты")
+}
+
+Rel(users, clients, "Используют")
+Rel(clients, api_gateway, "Существующий REST API", "HTTPS")
+
+Rel(api_gateway, legacy_monolith, "fallback", "HTTP")
+Rel(api_gateway, core_services, "new routes", "REST")
+
+Rel(legacy_monolith, compat_layer, "ACL")
+Rel(compat_layer, core_services, "DTO", "REST")
+
+Rel(core_services, event_broker, "events")
+Rel(event_broker, async_services, "async")
+
+Rel(async_services, service_datastores, "private data")
+
+Rel(core_services, external_integrations, "REST")
+Rel(async_services, external_integrations, "push")
+Rel(async_services, datalens, "BI")
+
+Lay_D(users, clients)
+Lay_D(clients, api_gateway)
+Lay_D(api_gateway, legacy_monolith)
+Lay_R(api_gateway, core_services)
+Lay_D(legacy_monolith, compat_layer)
+Lay_R(compat_layer, core_services)
+Lay_D(core_services, event_broker)
+Lay_D(event_broker, async_services)
+Lay_D(async_services, service_datastores)
+Lay_D(service_datastores, observability)
+
+SHOW_LEGEND()
+@enduml

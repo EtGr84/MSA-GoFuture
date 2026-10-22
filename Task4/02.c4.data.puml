@@ -1,0 +1,72 @@
+@startuml GoFuture_Task4_Data_Platform_C4
+!include <C4/C4_Container>
+
+LAYOUT_TOP_DOWN()
+skinparam linetype ortho
+skinparam nodesep 55
+skinparam ranksep 60
+
+System_Ext(datalens, "DataLens", "BI-инструмент")
+
+System_Boundary(gofuture, "GoFuture Data / ML / BI Platform") {
+    Container_Boundary(sources, "Data sources") {
+        Container(services, "Domain microservices", "Booking / Driver / Pricing / Payments / Geography / Fraud", "Публикуют доменные события")
+        ContainerQueue(kafka, "Kafka event backbone", "Kafka", "Доменные события, replay, retry")
+        Container(cdc, "CDC connectors", "Debezium / Kafka Connect", "Изменения сервисных БД")
+    }
+
+    Container(ingestion, "Ingestion Layer", "Flink / Kafka Connect", "Принимает события и CDC, валидирует схемы, пишет raw слой")
+
+    Container_Boundary(processing, "Processing") {
+        Container(flink, "Flink / Kafka Streams", "Stream processing", "Realtime features: demand, supply, hot zones, fraud")
+        Container(spark, "Spark", "Batch processing", "Backfill, training datasets, тяжёлые агрегации")
+        Container(orchestrator, "Workflow Orchestrator", "Airflow / Argo Workflows", "Расписание batch и ML pipelines")
+    }
+
+    Container_Boundary(storage, "Storage and features") {
+        ContainerDb(bronze, "Bronze Data Lake", "Object Storage", "Сырые события и CDC")
+        ContainerDb(silver, "Silver Curated Tables", "Lakehouse", "Очищенные и нормализованные данные")
+        ContainerDb(gold, "Gold Data Marts", "ClickHouse", "BI-витрины и агрегаты")
+        ContainerDb(feature_store, "Feature Store", "Online + Offline store", "Признаки для training и serving")
+    }
+
+    Container_Boundary(ml, "ML platform") {
+        Container(training, "Training Pipelines", "Spark / Python", "Demand forecast, dynamic pricing, fraud models")
+        Container(model_registry, "Model Registry", "MLflow-like registry", "Версии моделей, метрики, lineage")
+        Container(model_serving, "Model Serving", "Online inference", "Realtime prediction API")
+    }
+
+    Container(quality, "Data Quality and Governance", "Great Expectations / Soda / DataHub", "Data contracts, checks, lineage, catalog, PII tags")
+    Container(observability, "Data Observability", "Prometheus / Grafana / Loki", "Freshness, lag, drift, job failures")
+}
+
+Rel(services, kafka, "events")
+Rel(services, cdc, "DB changes")
+Rel(kafka, ingestion, "stream")
+Rel(cdc, ingestion, "CDC")
+Rel(ingestion, bronze, "raw data")
+
+Rel(bronze, processing, "replay / batch / stream")
+Rel(processing, silver, "curated datasets")
+Rel(processing, feature_store, "features")
+Rel(silver, gold, "business marts")
+
+Rel(feature_store, ml, "training + online features")
+Rel(gold, datalens, "BI")
+Rel(ml, model_serving, "approved models")
+
+Rel(quality, storage, "quality gates")
+Rel(quality, ml, "feature/model validation")
+Rel(processing, observability, "job metrics")
+Rel(storage, observability, "freshness / volume")
+Rel(ml, observability, "drift / latency")
+
+Lay_D(sources, ingestion)
+Lay_D(ingestion, storage)
+Lay_D(storage, ml)
+Lay_R(storage, datalens)
+Lay_R(quality, storage)
+Lay_D(quality, observability)
+
+SHOW_LEGEND()
+@enduml
