@@ -1,1 +1,54 @@
+@startuml GoFuture_Task3_Failover_C4
+!include <C4/C4_Container>
 
+LAYOUT_LEFT_RIGHT()
+skinparam linetype ortho
+
+AddContainerTag("new", $bgColor="#B71C1C", $fontColor="#FFFFFF", $borderColor="#7F0000", $legendText="new / changed in Task3")
+AddRelTag("new", $textColor="#B71C1C", $lineColor="#B71C1C", $lineThickness="2", $legendText="failover flow")
+
+Person(sea_users, "SEA пользователи", "Пассажиры и водители")
+Person(latam_users, "LATAM пользователи", "Пассажиры и водители")
+
+Container(tm, "Global Traffic Manager", "GeoDNS / Anycast", "Переключает трафик по health checks", "", "new")
+Container(waf, "Edge WAF", "WAF / DDoS", "Единая защитная точка входа", "", "new")
+
+Container(sea_primary, "SEA-1 Singapore", "Active region", "Primary для части SEA", "", "new")
+Container(sea_failover, "SEA-2 Jakarta", "Active failover region", "Принимает трафик при сбое SEA-1", "", "new")
+Container(latam_primary, "LATAM-1 Sao Paulo", "Active region", "Primary для Brazil/eastern South America", "", "new")
+Container(latam_failover, "LATAM-2 Santiago", "Active failover region", "Принимает LATAM-трафик при сбое Sao Paulo", "", "new")
+ContainerDb(sea_primary_data, "SEA-1 local data", "PostgreSQL + Kafka", "Операционные данные поездок", "", "new")
+ContainerDb(sea_failover_data, "SEA-2 local data", "PostgreSQL + Kafka", "Реплика разрешённых событий", "", "new")
+ContainerDb(latam_primary_data, "LATAM-1 local data", "PostgreSQL + Kafka", "Операционные данные поездок", "", "new")
+ContainerDb(latam_failover_data, "LATAM-2 local data", "PostgreSQL + Kafka", "Реплика разрешённых событий", "", "new")
+Container(monitoring, "Global Health and SLO", "Prometheus / synthetic probes", "Сигнал для failover", "", "new")
+
+Rel(sea_users, tm, "normal route", "DNS", "", "", "new")
+Rel(latam_users, tm, "normal route", "DNS", "", "", "new")
+Rel(tm, waf, "healthy edge", "HTTPS", "", "", "new")
+Rel(waf, sea_primary, "SEA primary traffic", "HTTPS", "", "", "new")
+Rel(waf, sea_failover, "SEA failover traffic", "HTTPS", "", "", "new")
+Rel(waf, latam_primary, "LATAM primary traffic", "HTTPS", "", "", "new")
+Rel(waf, latam_failover, "LATAM failover traffic", "HTTPS", "", "", "new")
+Rel(sea_primary, sea_primary_data, "local write")
+Rel(sea_failover, sea_failover_data, "local write")
+Rel(latam_primary, latam_primary_data, "local write")
+Rel(latam_failover, latam_failover_data, "local write")
+Rel(sea_primary_data, sea_failover_data, "async events", "Kafka/CDC", "", "", "new")
+Rel(latam_primary_data, latam_failover_data, "async events", "Kafka/CDC", "", "", "new")
+Rel(monitoring, tm, "region unhealthy", "API", "", "", "new")
+
+Lay_R(sea_users, tm)
+Lay_D(latam_users, tm)
+Lay_R(tm, waf)
+Lay_R(waf, sea_primary)
+Lay_D(sea_primary, sea_failover)
+Lay_D(sea_primary, sea_primary_data)
+Lay_D(sea_failover, sea_failover_data)
+Lay_R(waf, latam_primary)
+Lay_D(latam_primary, latam_failover)
+Lay_D(latam_primary, latam_primary_data)
+Lay_D(latam_failover, latam_failover_data)
+
+SHOW_LEGEND()
+@enduml
