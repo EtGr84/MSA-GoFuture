@@ -1,1 +1,37 @@
+@startuml GoFuture_Task3_Replication_C4
+!include <C4/C4_Container>
 
+LAYOUT_LEFT_RIGHT()
+skinparam linetype ortho
+
+AddContainerTag("new", $bgColor="#B71C1C", $fontColor="#FFFFFF", $borderColor="#7F0000", $legendText="new / changed in Task3")
+AddRelTag("new", $textColor="#B71C1C", $lineColor="#B71C1C", $lineThickness="2", $legendText="replication flow")
+
+Container(sea1, "SEA-1 Singapore", "Regional platform", "Services, PostgreSQL, Kafka, Redis", "", "new")
+Container(sea2, "SEA-2 Jakarta", "Regional platform", "Services, PostgreSQL, Kafka, Redis", "", "new")
+Container(latam1, "LATAM-1 Sao Paulo", "Regional platform", "Services, PostgreSQL, Kafka, Redis", "", "new")
+Container(latam2, "LATAM-2 Santiago", "Regional platform", "Services, PostgreSQL, Kafka, Redis", "", "new")
+Container(control, "Control / Partner Region", "Yandex Cloud", "Back-office, GitOps and control metadata", "", "new")
+
+Container(kafka_replication, "Kafka Replication Layer", "MirrorMaker 2 / Cluster Linking", "Разрешённые топики без лишних PII", "", "new")
+ContainerDb(global_analytics, "Global Analytics Store", "ClickHouse / Data Lake", "Обезличенные агрегаты и fraud intelligence", "", "new")
+Container(compliance_gate, "Compliance Gate", "Policy engine / DLP", "Проверяет классы данных перед экспортом", "", "new")
+
+Rel(sea1, kafka_replication, "regional events", "Kafka", "", "", "new")
+Rel(sea2, kafka_replication, "regional events", "Kafka", "", "", "new")
+Rel(latam1, kafka_replication, "regional events", "Kafka", "", "", "new")
+Rel(latam2, kafka_replication, "regional events", "Kafka", "", "", "new")
+Rel(control, compliance_gate, "policies / allowed exports", "GitOps metadata", "", "", "new")
+Rel(kafka_replication, compliance_gate, "policy check", "DLP", "", "", "new")
+Rel(compliance_gate, global_analytics, "allowed aggregates", "Batch/stream", "", "", "new")
+
+Lay_R(sea1, kafka_replication)
+Lay_D(sea1, sea2)
+Lay_D(sea2, latam1)
+Lay_D(latam1, latam2)
+Lay_D(latam2, control)
+Lay_R(kafka_replication, compliance_gate)
+Lay_R(compliance_gate, global_analytics)
+
+SHOW_LEGEND()
+@enduml
