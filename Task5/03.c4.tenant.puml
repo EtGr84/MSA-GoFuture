@@ -1,1 +1,64 @@
+@startuml GoFuture_Task5_Tenant_Platform_C2
+!include <C4/C4_Component>
 
+LAYOUT_TOP_DOWN()
+skinparam linetype ortho
+skinparam nodesep 55
+skinparam ranksep 60
+
+Person(partner_admin, "Partner Admin", "Управляет SSO, пользователями и настройками партнёра")
+Person(partner_user, "Partner User", "Операции, финансы, аналитика, поддержка")
+System_Ext(partner_idp, "Partner IdP", "OIDC / SAML SSO")
+
+System_Boundary(gofuture, "GoFuture Multi-Tenant Platform") {
+    Container(portal, "Partner Portal", "Web", "Self-service onboarding и управление tenant")
+    Container(api_gateway, "API Gateway / BFF", "Envoy/Nginx", "Проверяет токены, tenant context, quotas")
+
+    Container(iam_policy, "IAM and Policy Enforcement", "IdP + OPA/Zanzibar-like", "SSO, MFA, RBAC + ABAC, service accounts")
+    Container(registry, "Tenant Registry", "PostgreSQL", "tenant_id, region, isolation tier, feature flags, quotas, compliance")
+
+    Container_Boundary(control_plane, "Tenant control plane") {
+        Container(onboarding, "Onboarding Service", "Workflow service", "Создаёт tenant и запускает provisioning")
+        Container(provisioning, "Provisioning Engine", "Terraform / GitOps", "Namespace, DB/schema, keys, quotas, dashboards")
+        Container(config, "Feature and Config Service", "Config API", "Tenant-specific настройки и флаги")
+    }
+
+    Container_Boundary(data_plane, "Tenant-aware data plane") {
+        Container(services, "Domain Services", "Booking / Driver / Payments / Analytics", "Обрабатывают запросы с tenant context")
+        ContainerDb(tenant_data, "Tenant-isolated data stores", "PostgreSQL / ClickHouse / Redis", "Schema/DB/RLS per tenant, tenant KMS keys")
+        ContainerQueue(kafka, "Tenant-aware Kafka topics", "Kafka", "tenant_id и region_id в событиях")
+    }
+
+    Container(observability, "Tenant Observability", "Prometheus / Grafana / Loki / Alertmanager", "SLO, usage, cost, security events по tenant labels")
+    Container(audit, "Audit Log", "Append-only storage", "IAM, admin actions, data access, break-glass")
+}
+
+Rel(partner_admin, portal, "onboarding / admin")
+Rel(partner_user, api_gateway, "tenant API")
+Rel(partner_idp, iam_policy, "SSO federation")
+
+Rel(portal, onboarding, "create tenant")
+Rel(onboarding, registry, "tenant metadata")
+Rel_L(onboarding, provisioning, "provision resources")
+Rel(provisioning, data_plane, "DB/schema/Kafka/KMS")
+Rel(provisioning, observability, "dashboards/alerts")
+Rel_L(registry, config, "tenant config")
+Rel(registry, iam_policy, "roles and attributes")
+
+Rel(api_gateway, iam_policy, "authz")
+Rel(api_gateway, services, "tenant-scoped request")
+Rel_L(services, tenant_data, "tenant data")
+Rel(services, kafka, "tenant events")
+Rel_R(iam_policy, audit, "auth decisions")
+Rel(services, observability, "tenant metrics/logs")
+
+Lay_D(partner_admin, portal)
+Lay_D(portal, control_plane)
+Lay_D(control_plane, data_plane)
+Lay_D(partner_user, api_gateway)
+Lay_D(api_gateway, data_plane)
+Lay_R(api_gateway, iam_policy)
+Lay_D(data_plane, observability)
+
+SHOW_LEGEND()
+@enduml
